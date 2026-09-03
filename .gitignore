@@ -1,0 +1,36 @@
+# 相依套件
+node_modules
+
+# Nuxt 產物
+.nuxt
+.output
+.data
+.nitro
+.cache
+dist
+
+# 環境變數（絕對不要提交真實的密鑰）
+.env
+.env.*
+!.env.example
+
+# 測試與覆蓋率
+coverage
+*.local
+
+# 編輯器 / 系統
+.DS_Store
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# 日誌
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*

@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "description": "Nuxt 4 + BFF Node layer production template with security middleware, structured logging, unified API format, and integration tests."
+  },
+  "nav": {
+    "home": "Home",
+    "demo": "Demo",
+    "primary": "Primary navigation",
+    "mobile": "Mobile navigation",
+    "toggleMenu": "Toggle menu"
+  },
+  "theme": {
+    "toDark": "Switch to dark mode",
+    "toLight": "Switch to light mode"
+  },
+  "auth": {
+    "login": "Sign in",
+    "logout": "Sign out",
+    "email": "Email",
+    "password": "Password",
+    "passwordHint": "At least 8 characters",
+    "demoHint": "Demo mode: any email with the password password1234 will sign you in."
+  },
+  "demo": {
+    "overview": {
+      "title": "Template demos",
+      "devOnly": "Development only",
+      "heading": "Nuxt 4 + BFF Production Template",
+      "subheading": "The frontend only calls its own Node layer, which then calls external APIs. Security, logging, unified formats, and tests are all built in.",
+      "features": {
+        "security": {
+          "title": "Security",
+          "body": "Security headers, CORS allowlist, rate limiting, CSRF, and body guards across six middleware layers."
+        },
+        "logging": {
+          "title": "Structured logging",
+          "body": "Pino JSON output with a requestId on every log line for full request tracing."
+        },
+        "format": {
+          "title": "Unified format",
+          "body": "Success and failure always share one shape, so the frontend needs no defensive parsing."
+        },
+        "bff": {
+          "title": "BFF architecture",
+          "body": "Upstream tokens never leave the Node layer — the browser never sees them."
+        },
+        "testing": {
+          "title": "Integration tests",
+          "body": "Vitest across unit, component, and SSR end-to-end layers, with MSW intercepting upstream APIs."
+        },
+        "rwd": {
+          "title": "Responsive",
+          "body": "Tailwind v4 CSS-first theming, fluid typography, and flicker-free dark mode."
+        }
+      },
+      "links": {
+        "api": {
+          "title": "Two API calling styles",
+          "body": "Declarative (SSR) vs imperative, with pagination and the unified error format."
+        },
+        "login": {
+          "title": "Sign-in flow",
+          "body": "BFF auth demo: the token stays in the Node layer, the browser only gets an httpOnly cookie."
+        }
+      }
+    },
+    "title": "API calling styles",
+    "description": "This page uses both wrappers: declarative for the list (SSR), imperative for button actions.",
+    "methodA": "Style A: declarative",
+    "methodB": "Style B: imperative",
+    "methodBDescription": "Called inside event handlers — ideal for form submissions and deletions.",
+    "refresh": "Refresh",
+    "peek": "Fetch first item",
+    "triggerError": "Trigger 404 error",
+    "viewDetail": "View detail",
+    "backToList": "Back to list",
+    "detail": "Detail",
+    "createdAt": "Created at",
+    "prev": "Previous",
+    "next": "Next",
+    "pageInfo": "Page {page} of {total} · {count} items"
+  },
+  "home": {
+    "title": "Home",
+    "placeholder": "This is the template default home page — replace it with your own. All demo pages live under /demo and exist only in development.",
+    "viewDemo": "View template demos"
+  }
+}

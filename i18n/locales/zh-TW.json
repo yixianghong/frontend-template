@@ -1,0 +1,88 @@
+{
+  "meta": {
+    "description": "Nuxt 4 + BFF Node 層企業級樣板，內建資安防護、結構化日誌、統一 API 格式與整合測試。"
+  },
+  "nav": {
+    "home": "首頁",
+    "demo": "示範",
+    "primary": "主要導覽",
+    "mobile": "行動版導覽",
+    "toggleMenu": "開啟或關閉選單"
+  },
+  "theme": {
+    "toDark": "切換至深色模式",
+    "toLight": "切換至亮色模式"
+  },
+  "auth": {
+    "login": "登入",
+    "logout": "登出",
+    "email": "電子郵件",
+    "password": "密碼",
+    "passwordHint": "至少 8 個字元",
+    "demoHint": "示範模式：任意信箱搭配密碼 password1234 即可登入。"
+  },
+  "demo": {
+    "overview": {
+      "title": "樣板示範",
+      "devOnly": "僅開發環境可見",
+      "heading": "Nuxt 4 + BFF 企業級樣板",
+      "subheading": "前端只呼叫自家 Node 層，Node 層再呼叫外部 API。資安、日誌、統一格式、測試全部內建。",
+      "features": {
+        "security": {
+          "title": "資安防護",
+          "body": "安全標頭、CORS 白名單、流量限制、CSRF、請求體防護，六層 middleware。"
+        },
+        "logging": {
+          "title": "結構化日誌",
+          "body": "Pino JSON 格式，每筆請求都有 requestId 可串連完整軌跡。"
+        },
+        "format": {
+          "title": "統一格式",
+          "body": "成功與錯誤永遠是同一種形狀，前端不必寫防禦性程式碼。"
+        },
+        "bff": {
+          "title": "BFF 架構",
+          "body": "外部 API token 只存在 Node 層，前端與瀏覽器完全接觸不到。"
+        },
+        "testing": {
+          "title": "整合測試",
+          "body": "Vitest 分成單元、元件、SSR 端對端三層，MSW 攔截外部 API。"
+        },
+        "rwd": {
+          "title": "RWD",
+          "body": "Tailwind v4 CSS-first 主題、流體字級、深色模式無閃爍。"
+        }
+      },
+      "links": {
+        "api": {
+          "title": "兩種 API 呼叫方式",
+          "body": "宣告式（SSR）與命令式的對照示範，含分頁與統一錯誤格式。"
+        },
+        "login": {
+          "title": "登入流程",
+          "body": "BFF 認證示範：token 只留在 Node 層，前端只拿得到 httpOnly cookie。"
+        }
+      }
+    },
+    "title": "API 呼叫方式示範",
+    "description": "同一頁同時使用兩種封裝：列表用宣告式（SSR），按鈕操作用命令式。",
+    "methodA": "方式 A：宣告式",
+    "methodB": "方式 B：命令式",
+    "methodBDescription": "在事件處理函式中呼叫，適合表單送出、刪除等使用者動作。",
+    "refresh": "重新整理",
+    "peek": "取得第一筆詳情",
+    "triggerError": "觸發 404 錯誤",
+    "viewDetail": "查看詳情",
+    "backToList": "回到列表",
+    "detail": "詳情",
+    "createdAt": "建立時間",
+    "prev": "上一頁",
+    "next": "下一頁",
+    "pageInfo": "第 {page} / {total} 頁，共 {count} 筆"
+  },
+  "home": {
+    "title": "首頁",
+    "placeholder": "這是樣板的預設首頁，請替換成你的專案內容。所有示範頁面都在 /demo 底下，且只在開發環境存在。",
+    "viewDemo": "查看樣板示範"
+  }
+}

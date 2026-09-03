@@ -1,0 +1,20 @@
+{
+  // 開啟這個專案時，VS Code 會提示安裝以下擴充套件。
+  // 沒有它們的話，存檔自動修正與型別提示都不會運作。
+  "recommendations": [
+    // 存檔時自動修正（必要）
+    "dbaeumer.vscode-eslint",
+    // 存檔時自動排版（必要）
+    "esbenp.prettier-vscode",
+    // Vue 3 的語言支援與型別檢查（必要）
+    "Vue.volar",
+    // Tailwind class 補全與 hover 預覽
+    "bradlc.vscode-tailwindcss",
+    // 讓沒裝上述套件的編輯器也能沿用 .editorconfig 的基本設定
+    "EditorConfig.EditorConfig"
+  ],
+  "unwantedRecommendations": [
+    // 舊版 Vue 擴充套件，與 Vue.volar 衝突
+    "octref.vetur"
+  ]
+}

@@ -1,0 +1,199 @@
+/**
+ * Tailwind CSS v4 —— CSS-first 設定。
+ *
+ * v4 取消了 `tailwind.config.js`，改成直接在 CSS 裡用 `@theme` 定義設計 token。
+ * 好處是這些 token 同時也是**真正的 CSS 變數**，可以在任何地方用
+ * `var(--color-brand-500)` 取用，不再需要透過 JS 設定檔轉換。
+ *
+ * 對應的 Vite plugin 設定在 `nuxt.config.ts` 的 `vite.plugins`。
+ */
+
+@import 'tailwindcss';
+
+/**
+ * 深色模式改用 class 策略。
+ *
+ * 預設的 v4 深色模式跟隨作業系統偏好，使用者無法自己切換。
+ * 這裡改成看 `<html>` 上有沒有 `.dark`，由 VueUse 的 `useColorMode` 控制
+ * （見 `app/composables/useTheme.ts`），並且會記在 cookie 裡讓 SSR 也拿得到，
+ * 避免載入瞬間先閃一下亮色（FOUC）。
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ---------------------------------------------------------------------
+   * 斷點（RWD 的骨架）
+   *
+   * 沿用 Tailwind 預設值，額外補一個 `xs`。單位用 rem 而非 px，
+   * 這樣使用者調大瀏覽器字級時，版面切換點也會跟著調整，對無障礙較友善。
+   *
+   *   xs   30rem = 480px   大尺寸手機
+   *   sm   40rem = 640px   小平板 / 橫向手機
+   *   md   48rem = 768px   平板直向
+   *   lg   64rem = 1024px  平板橫向 / 小筆電
+   *   xl   80rem = 1280px  桌機
+   *   2xl  96rem = 1536px  大螢幕
+   * ------------------------------------------------------------------- */
+  --breakpoint-xs: 30rem;
+
+  /* ---------------------------------------------------------------------
+   * 語意化色票
+   *
+   * 元件請一律使用語意名稱（`bg-surface`、`text-muted`），不要直接用
+   * `bg-slate-100`。這樣換品牌色或做深色模式時只需要改這裡一處。
+   * ------------------------------------------------------------------- */
+
+  /* 品牌主色 */
+  --color-brand-50: oklch(0.97 0.014 254);
+  --color-brand-100: oklch(0.93 0.032 255);
+  --color-brand-200: oklch(0.88 0.059 254);
+  --color-brand-300: oklch(0.81 0.101 252);
+  --color-brand-400: oklch(0.71 0.143 254);
+  --color-brand-500: oklch(0.62 0.178 258);
+  --color-brand-600: oklch(0.55 0.193 262);
+  --color-brand-700: oklch(0.49 0.176 264);
+  --color-brand-800: oklch(0.42 0.145 265);
+  --color-brand-900: oklch(0.38 0.116 266);
+
+  /* 狀態色 */
+  --color-success: oklch(0.65 0.17 152);
+  --color-warning: oklch(0.75 0.16 78);
+  --color-danger: oklch(0.6 0.21 25);
+
+  /* 介面基底色（深色模式會在下方 :root 覆寫） */
+  --color-surface: oklch(1 0 0);
+  --color-surface-muted: oklch(0.97 0.002 250);
+  --color-surface-raised: oklch(1 0 0);
+  --color-border: oklch(0.92 0.004 250);
+  --color-content: oklch(0.24 0.012 255);
+  --color-content-muted: oklch(0.52 0.011 255);
+
+  /* ---------------------------------------------------------------------
+   * 流體字級（fluid typography）
+   *
+   * 用 `clamp(最小值, 隨視窗縮放的值, 最大值)`，字級會隨螢幕寬度平滑變化，
+   * 不需要在每個斷點各寫一次 `text-2xl md:text-3xl lg:text-4xl`。
+   *
+   * 中間的 `vw` 係數算法：(最大字級 - 最小字級) / (最大視窗 - 最小視窗)
+   * ------------------------------------------------------------------- */
+  --text-fluid-sm: clamp(0.875rem, 0.85rem + 0.15vw, 1rem);
+  --text-fluid-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  --text-fluid-lg: clamp(1.125rem, 1.05rem + 0.4vw, 1.375rem);
+  --text-fluid-xl: clamp(1.375rem, 1.2rem + 0.85vw, 2rem);
+  --text-fluid-2xl: clamp(1.75rem, 1.4rem + 1.75vw, 3rem);
+  --text-fluid-3xl: clamp(2.25rem, 1.6rem + 3.2vw, 4rem);
+
+  /* 字體：優先使用系統的中文字體，避免載入肥大的網路字型 */
+  --font-sans:
+    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', 'PingFang TC',
+    'Microsoft JhengHei', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* 內容區最大寬度：超過這個寬度的文字行會太長而難以閱讀 */
+  --container-content: 72rem;
+}
+
+/**
+ * 深色模式的 token 覆寫。
+ * 只換顏色變數的值，所有元件的 class 完全不用改。
+ */
+:root:where(.dark) {
+  --color-surface: oklch(0.21 0.012 258);
+  --color-surface-muted: oklch(0.26 0.014 258);
+  --color-surface-raised: oklch(0.27 0.015 258);
+  --color-border: oklch(0.34 0.016 258);
+  --color-content: oklch(0.95 0.004 250);
+  --color-content-muted: oklch(0.68 0.012 255);
+}
+
+@layer base {
+  html {
+    /* 錨點跳轉時平滑捲動，但尊重使用者的「減少動態效果」系統設定 */
+    scroll-behavior: smooth;
+    /* 固定式 header 存在時，錨點不會被 header 遮住 */
+    scroll-padding-top: 5rem;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    background-color: var(--color-surface);
+    color: var(--color-content);
+    font-family: var(--font-sans);
+    font-size: var(--text-fluid-base);
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /*
+   * 鍵盤操作的焦點樣式。
+   * 用 `:focus-visible` 而非 `:focus`，滑鼠點擊時不會出現外框，
+   * 但用 Tab 鍵操作時看得見 —— 兼顧美觀與無障礙。
+   */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  /* 圖片預設不溢出容器，這是 RWD 最基本的一條 */
+  :where(img, video, canvas, svg) {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@layer components {
+  /**
+   * 內容容器。行動裝置留 1rem 邊距，大螢幕置中並限制最大寬度。
+   * 用 `@utility` 之外的方式定義是為了讓它能被 `@apply` 使用。
+   */
+  .container-content {
+    width: 100%;
+    max-width: var(--container-content);
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  @media (width >= 48rem) {
+    .container-content {
+      padding-inline: 2rem;
+    }
+  }
+}
+
+/**
+ * 只給螢幕閱讀器的文字。視覺上隱藏，但輔助科技讀得到。
+ * 用於補充純圖示按鈕的說明。
+ */
+@utility sr-only-focusable {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+
+  &:focus {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
+}

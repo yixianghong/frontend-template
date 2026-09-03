@@ -1,0 +1,20 @@
+{
+  // Nuxt 4 把型別環境拆成四個獨立的 project：
+  //   app     → app/ 底下的前端程式碼（DOM 型別、Vue 元件）
+  //   server  → server/ 底下的 BFF 程式碼（Node 型別、Nitro auto-imports）
+  //   shared  → shared/ 底下前後端共用的程式碼（不含任何環境專屬型別）
+  //   node    → nuxt.config.ts 等建置期設定檔
+  //
+  // 拆開的好處是：在 server/ 誤用 `window`、或在 app/ 誤用 `process.env`
+  // 這類跨環境的錯誤，會在型別檢查階段就被抓出來。
+  //
+  // 這些 tsconfig 由 `nuxt prepare` 產生，不要手動編輯 .nuxt/ 底下的檔案。
+  // 要調整編譯選項請改 nuxt.config.ts 的 `typescript.tsConfig`。
+  "files": [],
+  "references": [
+    { "path": "./.nuxt/tsconfig.app.json" },
+    { "path": "./.nuxt/tsconfig.server.json" },
+    { "path": "./.nuxt/tsconfig.shared.json" },
+    { "path": "./.nuxt/tsconfig.node.json" }
+  ]
+}

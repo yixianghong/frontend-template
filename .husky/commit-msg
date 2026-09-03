@@ -1,0 +1,2 @@
+# 驗證 commit 訊息符合 Conventional Commits 格式
+pnpm commitlint --edit "$1"

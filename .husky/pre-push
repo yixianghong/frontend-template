@@ -1,0 +1,3 @@
+# push 前跑型別檢查與快速測試。
+# 刻意不跑 e2e —— 那需要一次完整建置，留給 CI 執行。
+pnpm typecheck && pnpm test:unit && pnpm test:nuxt

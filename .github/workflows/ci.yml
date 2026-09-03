@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一個 PR 有新 commit 時，取消還在跑的舊流程，省 CI 額度
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 測試用的假值。真實密鑰請放 GitHub Secrets，絕不寫在這裡。
+  NUXT_SESSION_PASSWORD: ci-only-session-password-with-enough-length
+
+jobs:
+  # 靜態檢查與快速測試放一起，幾十秒內就能給出回饋
+  quality:
+    name: 檢查與單元測試
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 安裝相依套件
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: 格式檢查
+        run: pnpm format:check
+
+      - name: 型別檢查
+        run: pnpm typecheck
+
+      - name: 單元測試
+        run: pnpm test:unit
+
+      - name: 元件與 composable 測試
+        run: pnpm test:nuxt
+
+  # e2e 需要完整建置，較慢，獨立成一個 job 才能與上面平行執行
+  e2e:
+    name: 端對端測試
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 安裝相依套件
+        run: pnpm install --frozen-lockfile
+
+      - name: 端對端測試
+        run: pnpm test:e2e
+
+  build:
+    name: 建置
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 安裝相依套件
+        run: pnpm install --frozen-lockfile
+
+      - name: 建置
+        run: pnpm build
+        env:
+          NUXT_API_BASE_URL: https://api.example.com
+
+      - name: 驗證產物能實際啟動，且 demo 區不存在於 production
+        run: |
+          node .output/server/index.mjs &
+          SERVER_PID=$!
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && break
+            sleep 1
+          done
+
+          # 健康檢查要通
+          curl -sf http://localhost:3000/api/health | grep -q '"success":true'
+
+          # demo 頁面在 production 建置時已被 pages:extend 移除，必須回 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/demo)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/demo/api)" = "404"
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/demo/login)" = "404"
+
+          # demo API 由 server middleware 擋下，同樣回 404
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/demo/list)" = "404"
+
+          kill $SERVER_PID
+        env:
+          NUXT_API_BASE_URL: https://api.example.com
+
+  docker:
+    name: Docker 映像
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - name: 建置映像
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,93 @@
+{
+  // ─────────────────────────────────────────────────────────────────────
+  // 存檔時自動格式化與修正
+  //
+  // 這個專案的分工是：
+  //   Prettier → 排版（縮排、引號、換行）
+  //   ESLint   → 程式碼品質（未使用的變數、Vue 規則、可自動修的寫法問題）
+  //
+  // `eslint-config-prettier` 已經關掉所有與 Prettier 衝突的排版規則，
+  // 所以兩者同時啟用不會互相打架。
+  //
+  // VS Code 的執行順序是「先跑 codeActionsOnSave，再跑 formatOnSave」，
+  // 因此 ESLint 修完之後 Prettier 會再排版一次，結果穩定收斂。
+  // ─────────────────────────────────────────────────────────────────────
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    // "explicit" 表示只在手動存檔時執行（自動存檔不觸發），避免打字打到一半被改
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // ── ESLint ──────────────────────────────────────────────────────────
+  // 本專案用 flat config（eslint.config.mjs）。ESLint 9+ 預設就是 flat，
+  // 這裡明確寫出來，避免有人的擴充套件版本較舊而回退到舊格式。
+  "eslint.useFlatConfig": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "vue",
+    "json",
+    "jsonc"
+  ],
+  // ── TypeScript ──────────────────────────────────────────────────────
+  // 使用專案鎖定的 TypeScript 版本（5.9），而非 VS Code 內建版本。
+  // 版本不一致會導致編輯器紅線與 `pnpm typecheck` 結果對不上。
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // ── Vue ─────────────────────────────────────────────────────────────
+  "[vue]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  // ── Tailwind CSS v4 ─────────────────────────────────────────────────
+  // v4 沒有 tailwind.config.js，主題定義在 CSS 的 @theme 區塊裡，
+  // 要指到那個檔案 IntelliSense 才吃得到自訂的色票與斷點。
+  "tailwindCSS.experimental.configFile": "app/assets/css/main.css",
+  // 讓 class 補全在這些屬性中也生效
+  "tailwindCSS.classAttributes": ["class", "className", "class:list", "activeClass"],
+  // @theme、@custom-variant 等 v4 語法不是標準 CSS，關掉編輯器的未知規則警告
+  "css.lint.unknownAtRules": "ignore",
+
+  // ── 編輯器一致性（與 .editorconfig 對齊）──────────────────────────────
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.tabSize": 2,
+
+  // ── 檔案總管：隱藏建置產物，減少雜訊 ────────────────────────────────
+  "files.exclude": {
+    "**/.nuxt": true,
+    "**/.output": true,
+    "**/.data": true,
+    "**/node_modules": true
+  },
+  // 但搜尋時 .nuxt 偶爾有用，所以只排除純產物
+  "search.exclude": {
+    "**/.nuxt": true,
+    "**/.output": true,
+    "**/coverage": true,
+    "**/pnpm-lock.yaml": true
+  }
+}
