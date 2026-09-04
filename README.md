@@ -83,26 +83,6 @@ production 建置後實際 curl 這些路徑，確認全部回 404。
 - `nuxt.config.ts` 的 `hooks.pages:extend` 與 `DEMO_ENABLED`
 - 記得先建立自己的登入頁，並更新 `runtimeConfig.public.loginPath`
 
-------------------------- | -------------------------------------------- |
-| `package.json` | `name` |
-| `.env` | `NUXT_SESSION_PASSWORD`、`NUXT_API_BASE_URL` |
-| `nuxt.config.ts` | `runtimeConfig.public.appName`、`siteUrl` |
-| `app/assets/css/main.css` | `@theme` 裡的品牌色與字體 |
-| `i18n/locales/*.json` | 文案 |
-| `public/favicon.svg` | 圖示 |
-
-### 開新專案時要刪的地方
-
-樣板為了「clone 下來就能看到完整資料流」內建了一組示範，開始寫真實功能前請刪除：
-
-- `server/utils/demo-data.ts`
-- `server/api/demo/`
-- `app/pages/demo/`
-- `app/composables/api/useDemoApi.ts`
-- `tests/nuxt/useDemoApi.test.ts`
-- `server/api/auth/login.post.ts` 中標記 `⚠️ DEMO 模式` 的區塊與 `demoLogin()`
-- `i18n/locales/*.json` 中的 `demo` 與 `home.features` 區段
-
 ---
 
 ## 目錄結構
@@ -126,6 +106,7 @@ docs/                   專案文件（README 以外的都放這裡）
 專案文件放在 [`docs/`](./docs)：
 
 - [開發約定](./docs/CONTRIBUTING.md) —— 不能破的規則、目錄職責、commit 規範、編輯器設定
+- [部落格主文](./docs/blog/nuxt4-bff-template.md) —— 這個樣板的設計說明與取捨；迭代短文放在 `docs/blog/updates/`
 
 ### `server/` 的執行順序
 
