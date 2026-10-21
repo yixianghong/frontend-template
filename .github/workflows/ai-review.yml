@@ -8,6 +8,16 @@
 # 代價是它與 ci.yml 的 quality job 平行跑，而不是「確定性檢查過了才花錢」。
 # 若你的團隊在意這點，把下面的 job 搬進 ci.yml 並加上 `needs: quality` 即可。
 #
+# ## 改到這個檔案的 PR 不會被 review
+#
+# action 會比對這個 workflow 檔與預設分支上的版本，內容不一致就拒絕執行
+# （log 裡是 "Skipping action due to workflow validation"）。這是它自己的安全機制：
+# 否則 PR 作者只要在 PR 裡改掉下面的 prompt，就能指示 reviewer 放水。
+#
+# 所以改這個檔案的 PR 得靠人看，合併之後才會生效。第一次把這個檔案加進專案時也一樣，
+# 那次 PR 不會有 AI review。這種情況下 action 以 exit 0 結束，
+# 下面那個偵測失敗的步驟不會觸發 —— 但 action 自己會在 run summary 留一條 warning。
+#
 # ## 為什麼不是 required check
 #
 # LLM 的輸出是非確定性的。把它設成必要檢查，第一次誤判卡住 merge 就會有人去關掉它，

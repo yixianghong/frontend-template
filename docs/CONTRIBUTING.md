@@ -309,6 +309,16 @@ AI review **刻意不設成 required check**，而且 workflow 上掛了 `contin
 LLM 的輸出是非確定性的，一旦當成必要檢查，第一次誤判卡住 merge 就會有人去關掉它，
 整套機制就報廢了。它的角色是 reviewer，不是 gate。
 
+### 改到 workflow 本身的 PR 不會被 review
+
+action 會比對 `.github/workflows/ai-review.yml` 與 `main` 上的版本，內容不一致就
+拒絕執行（Actions log 裡是 `Skipping action due to workflow validation`）。
+這是它自己的安全機制：否則 PR 作者只要在 PR 裡改掉 prompt，就能指示 reviewer 放水。
+
+所以動到那個檔案的 PR 得靠人看，合併之後才會生效 —— 第一次把這套機制加進專案的那支
+PR 也一樣。這種情況 action 以 exit 0 結束，所以上面那個偵測失敗的步驟不會觸發，
+但 action 自己會在 run summary 留一條 warning。
+
 ### 關掉某個 PR 的 AI review
 
 貼上 `skip-ai-review` label。草稿 PR 本來就不會觸發。
