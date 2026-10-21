@@ -16,7 +16,9 @@
 
 - [ ] `pnpm lint && pnpm typecheck` 通過
 - [ ] `pnpm test` 通過
+- [ ] `pnpm check:conventions` 通過（或已在描述說明 `[skip-policy: 理由]`）
 - [ ] 新增／修改的邏輯有對應的測試
 - [ ] 若動到 API 回傳格式，前後端型別（`shared/`）已同步更新
 - [ ] 若新增環境變數，已更新 `.env.example` 與 `server/plugins/00.env-validate.ts`
 - [ ] 若動到資安相關程式碼（`server/middleware/`），已在描述中說明影響範圍
+- [ ] AI review 的留言都已處理，或已回覆為什麼不處理

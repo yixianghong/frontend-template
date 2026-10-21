@@ -101,12 +101,16 @@ shared/                 前後端共用的型別、錯誤碼、zod schema（用 
 tests/                  unit / nuxt / e2e 三層測試
 i18n/locales/           語系檔
 docs/                   專案文件（README 以外的都放這裡）
+scripts/                零相依的命令列工具（約定檢查）
+.claude/commands/       Claude Code 的專案自訂指令（/review）
+CLAUDE.md               AI coding agent 的入口，指向 docs/CONTRIBUTING.md
 ```
 
 專案文件放在 [`docs/`](./docs)：
 
 - [開發約定](./docs/CONTRIBUTING.md) —— 不能破的規則、目錄職責、commit 規範、編輯器設定
 - [部落格主文](./docs/blog/nuxt4-bff-template.md) —— 這個樣板的設計說明與取捨；迭代短文放在 `docs/blog/updates/`
+- [AI Review 準則](./.github/AI_REVIEW.md) —— AI reviewer 的嚴重度分級、檢查清單、以及「不要報什麼」
 
 ### `server/` 的執行順序
 
@@ -444,9 +448,17 @@ nitro: {
 | `pnpm format` / `format:check` | Prettier                          |
 | `pnpm typecheck`               | TypeScript 型別檢查               |
 | `pnpm test`                    | 全部測試                          |
+| `pnpm check:conventions`       | 跨檔案的約定檢查（見下）          |
 
 Git hooks（husky）：commit 前跑 lint-staged、驗證 commit 訊息格式，
 push 前跑型別檢查與快速測試。
+
+`pnpm check:conventions` 抓的是 ESLint 看不到的「改了 A 卻沒改 B」——
+例如 `runtimeConfig` 多了一個鍵但 `.env.example` 沒跟上。它會在 CI 的檢查 job 裡跑，
+確定是例外時在 commit 訊息或 PR 描述寫 `[skip-policy: 理由]` 即可放行。
+
+PR 上還有一層 [AI review](./docs/CONTRIBUTING.md#ai-review-怎麼運作)，
+只留言不阻擋；地端打 `/review` 可以在 push 之前先跑同一份準則。
 
 編輯器存檔時的自動格式化（ESLint + Prettier）已設定在 `.vscode/`，
 設定方式與 JetBrains 的對應選項見 [docs/CONTRIBUTING.md](./docs/CONTRIBUTING.md#編輯器設定存檔自動格式化)。
