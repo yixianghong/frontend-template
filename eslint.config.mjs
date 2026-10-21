@@ -52,10 +52,62 @@ export default withNuxt(
     },
   },
   {
+    // 規則 3（docs/CONTRIBUTING.md）：頁面與元件不直接呼叫 API。
+    //
+    // 端點路徑只能出現在 app/composables/api/，這樣後端改路徑、加必填參數、
+    // 換分頁欄位名稱時只要改一個檔案。這是純語法層的約定，所以交給 ESLint 而不是
+    // 靠 review 時記得看（判斷題才交給 .github/AI_REVIEW.md 的 AI reviewer）。
+    //
+    // ⚠️ 只作用於 <script>，不涵蓋 template 運算式 —— vue-eslint-parser 的
+    // template AST 不走這個選擇器。template 裡直接打 API 的寫法極少，剩下的由 review 補。
+    files: ['app/pages/**/*.vue', 'app/components/**/*.vue', 'app/layouts/**/*.vue'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CallExpression[callee.name=/^(useApiFetch|useApi)$/]',
+          message:
+            '頁面與元件不直接呼叫 API。請收斂成 app/composables/api/ 的領域 composable，見 docs/CONTRIBUTING.md 規則 3。',
+        },
+        {
+          selector: 'Literal[value=/^\\/api\\//]',
+          message: 'API 路徑字串只能出現在 app/composables/api/，見 docs/CONTRIBUTING.md 規則 3。',
+        },
+      ],
+    },
+  },
+  {
+    // 規則 5（docs/CONTRIBUTING.md）：端點一律用 defineApiHandler 包裝。
+    //
+    // 它負責統一成功／錯誤格式與錯誤日誌；直接用 defineEventHandler 會讓這支端點的
+    // 回傳格式與其他端點不一致，前端就得為它寫特例。
+    //
+    // 只限 server/api 與 server/routes —— middleware 與 plugins 本來就該用
+    // defineEventHandler / defineNitroPlugin，不在這條規則的管轄範圍。
+    files: ['server/api/**/*.ts', 'server/routes/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "CallExpression[callee.name='defineEventHandler']",
+          message:
+            '端點請用 defineApiHandler 包裝以統一回傳格式，見 docs/CONTRIBUTING.md 規則 5。需要 Nitro 快取時改用 defineCachedEventHandler，並在這一行加上 eslint-disable 與理由。',
+        },
+      ],
+    },
+  },
+  {
     // 測試檔案放寬限制：測試中常需要 any 與 console
     files: ['tests/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      'no-console': 'off',
+    },
+  },
+  {
+    // 命令列腳本的輸出就是它的介面，console 是正常用法而非遺漏的 debug
+    files: ['scripts/**/*.mjs'],
+    rules: {
       'no-console': 'off',
     },
   },

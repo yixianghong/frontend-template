@@ -21,6 +21,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # 約定檢查要算 merge-base，需要完整歷史
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -34,6 +37,12 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: 約定檢查
+        run: pnpm check:conventions
+        env:
+          # 讓 [skip-policy: 理由] 也能寫在 PR 描述而不只是 commit 訊息裡
+          PR_BODY: ${{ github.event.pull_request.body }}
 
       - name: 格式檢查
         run: pnpm format:check

@@ -242,6 +242,7 @@ docs(readme): 補上 Docker 部署說明
 | 改了什麼                                  | 至少要有                           |
 | ----------------------------------------- | ---------------------------------- |
 | `server/utils/` 的純函式                  | `tests/unit/`                      |
+| `scripts/lib/` 的解析邏輯                 | `tests/unit/`                      |
 | 領域 composable（`app/composables/api/`） | `tests/nuxt/`                      |
 | composable 或元件                         | `tests/nuxt/`                      |
 | 新的 API 端點                             | `tests/e2e/`                       |
@@ -264,7 +265,72 @@ docs(readme): 補上 Docker 部署說明
 ## 送出 PR 前
 
 ```bash
-pnpm lint && pnpm typecheck && pnpm test
+pnpm lint && pnpm typecheck && pnpm test && pnpm check:conventions
 ```
 
-pre-push hook 會跑前兩項與快速測試，e2e 留給 CI。
+pre-push hook 會跑型別檢查與快速測試，e2e 留給 CI。
+
+`pnpm check:conventions` 抓的是 ESLint 看不到的事 —— ESLint 一次只看一個檔案，
+所以它無法知道「`nuxt.config.ts` 多了一個 `runtimeConfig` 鍵，但 `.env.example`
+沒跟上」。這支腳本讀 merge-base diff 來檢查這類跨檔案的約定，分成兩類：
+
+- **硬錯（會讓 CI 失敗）**：環境變數的三處同步、`runtimeConfig.public` 下出現
+  看起來像機密的鍵名。這些漏掉會在 runtime 才爆，正是上面
+  [新增環境變數的完整流程](#新增環境變數的完整流程) 想避免的事。
+- **軟提醒（只在 PR 上標 warning）**：[測試要求](#測試要求) 表的對應關係。
+  「這個改動到底需不需要測試」是判斷題 —— 純 refactor、改錯字不該被擋，
+  所以軟提醒只負責把事實攤出來，由 review 去判斷。
+
+硬錯確實會有例外（例如新增的設定鍵是建置期推導的，本來就沒有對應的環境變數）。
+在 commit 訊息或 PR 描述寫 `[skip-policy: 理由]` 即可放行，理由會被印在 CI log 裡，
+所以不會變成無聲的繞過。
+
+想在 push 之前先看一次 review 意見的話，在 Claude Code 裡打 `/review`（見下）。
+
+## AI review 怎麼運作
+
+PR 上有一層 AI reviewer（[`.github/workflows/ai-review.yml`](../.github/workflows/ai-review.yml)），
+讀的準則是 [`.github/AI_REVIEW.md`](../.github/AI_REVIEW.md)。
+地端打 `/review` 跑的是同一份準則，所以 push 上去不會出現意外的留言。
+
+### 三層的分工
+
+| 層          | 誰做                            | 性質               | 會不會擋你 |
+| ----------- | ------------------------------- | ------------------ | ---------- |
+| ESLint rule | `eslint.config.mjs`             | 確定性             | 會         |
+| 約定檢查    | `scripts/check-conventions.mjs` | 確定性（硬錯部分） | 會         |
+| AI review   | GitHub Actions / `/review`      | 非確定性           | **不會**   |
+
+原則只有一條：**能用規則表達的絕不交給 LLM。** 規則 3 與規則 5 已經下沉成 ESLint
+規則，規則 2 與環境變數同步下沉成腳本；AI 只負責規則表達不出來的判斷題 ——
+「這個錯誤處理的分支漏了什麼」、「這次改動到底需不需要測試」、
+「這個 composable 的參數應該是 `MaybeRefOrGetter` 嗎」。
+
+AI review **刻意不設成 required check**，而且 workflow 上掛了 `continue-on-error`。
+LLM 的輸出是非確定性的，一旦當成必要檢查，第一次誤判卡住 merge 就會有人去關掉它，
+整套機制就報廢了。它的角色是 reviewer，不是 gate。
+
+### 關掉某個 PR 的 AI review
+
+貼上 `skip-ai-review` label。草稿 PR 本來就不會觸發。
+
+來自 fork 的 PR 拿不到 secret，所以這個 job 會直接跳過 —— 這是刻意的，
+不要為了讓 fork PR 也能 review 而把 workflow 改成 `pull_request_target`，
+那等於把 token 交到 PR 作者手上。
+
+### 覺得它在亂報的時候
+
+噪音控制是持續的工作，不是設好就結束。AI review 失敗的原因幾乎不是漏抓，
+而是噪音多到沒人看 —— 一旦開始被當成背景雜訊，真正的問題也會被一起忽略。
+
+做法：
+
+1. 覺得某條留言是誤判 → 在那則留言按 👎
+2. 累積幾次之後回頭改 `.github/AI_REVIEW.md`：
+   **能變成 ESLint 規則的就下沉成規則，反覆誤判的檢查項就直接刪掉**
+3. 判斷標準只有一個：**留言被採納的比率**。
+   低於一半就是噪音太多，該砍檢查項，而不是再加檢查項
+
+反過來，發現 AI 漏掉了某類問題，先問「這能不能寫成 ESLint 規則或腳本」。
+能的話就寫成規則 —— 那是免費且確定的；不能的話才往 `.github/AI_REVIEW.md`
+的檢查清單加一條。
