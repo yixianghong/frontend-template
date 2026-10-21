@@ -45,14 +45,19 @@ jobs:
           fetch-depth: 0
 
       - uses: anthropics/claude-code-action@v1
+        id: review
         # 關鍵：即使 token 過期或 action 本身掛掉，這個 check 也不會變紅去卡住 merge。
         # AI review 是建議，不是 gate。
         continue-on-error: true
         with:
-          # 用 claude setup-token 產生，存進 GitHub Secrets。
-          # ⚠️ 這個 token 會過期，過期時這個 job 會悄悄地什麼都不做 ——
-          # 覺得 AI 不再留言時，先來 Actions 的 step log 看是不是這個原因。
-          # 不想輪替的話改用 anthropic_api_key，只是費用改成按量計費。
+          # 需要兩件事，缺一不可：
+          #   1. Claude Code GitHub App 裝在這個 repo（在 Claude Code 裡執行
+          #      /install-github-app，或裝 https://github.com/apps/claude）
+          #   2. 這個 secret（claude setup-token 產生後 gh secret set）
+          # 只設 secret 而沒裝 App 的話，action 會拿到 401 而什麼都不做。
+          #
+          # ⚠️ 這個 token 會過期。不想輪替的話改用 anthropic_api_key，
+          # 只是費用改成按量計費。
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # 用單一則留言持續更新進度，不會每次 push 都在 PR 上洗出一堆新留言
           track_progress: true
@@ -78,6 +83,14 @@ jobs:
           claude_args: |
             --max-turns 25
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr comment:*),Bash(git diff:*),Bash(git log:*),Read,Grep,Glob"
+
+      # continue-on-error 讓失敗變成綠燈，代價是「設定壞掉」會完全無聲 ——
+      # 不會有人發現 AI 其實已經好幾週沒在 review 了。
+      # 這一步把它變回看得見的 annotation，但仍然不讓 check 變紅。
+      - name: 設定有問題時明確說出來
+        if: steps.review.outcome == 'failure'
+        run: |
+          echo "::warning::AI review 沒有執行完成，這次 PR 沒有 AI 的意見。常見原因：(1) Claude Code GitHub App 沒裝在這個 repo —— 在 Claude Code 裡執行 /install-github-app；(2) CLAUDE_CODE_OAUTH_TOKEN 過期 —— 用 claude setup-token 重新產生。實際原因見上一步的 log。"
 # ── 安全性上刻意的取捨 ──────────────────────────────────────────────────
 #
 # 1. 用 pull_request 而不是 pull_request_target。

@@ -259,6 +259,29 @@ PR 上有一層 AI reviewer（[`.github/workflows/ai-review.yml`](../.github/wor
 讀的準則是 [`.github/AI_REVIEW.md`](../.github/AI_REVIEW.md)。
 地端打 `/review` 跑的是同一份準則，所以 push 上去不會出現意外的留言。
 
+### 第一次啟用時要做的事
+
+需要兩件事，**缺一不可**：
+
+1. **把 Claude Code GitHub App 裝到這個 repo** ——
+   在 Claude Code 裡執行 `/install-github-app`，或直接安裝
+   [github.com/apps/claude](https://github.com/apps/claude)。需要 repo 管理員權限。
+2. **設好 secret**：
+
+   ```bash
+   claude setup-token                    # 產生 OAuth token
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN  # 貼進 GitHub Secrets
+   gh label create skip-ai-review -d "這個 PR 跳過 AI review"
+   ```
+
+只做第 2 步而沒做第 1 步的話，action 會拿到 401 並且**什麼都不做**。
+因為 workflow 掛了 `continue-on-error`，check 仍然是綠的 ——
+所以 workflow 裡多了一步，會在這種情況下印出 `::warning` 說明原因。
+覺得 AI 突然不再留言時，先去 PR 上看有沒有那條 warning。
+
+`CLAUDE_CODE_OAUTH_TOKEN` 會過期，這是這個方案最主要的維運成本。
+嫌輪替麻煩的話把 workflow 的那一行換成 `anthropic_api_key`，改成按量計費。
+
 ### 三層的分工
 
 | 層          | 誰做                            | 性質               | 會不會擋你 |
