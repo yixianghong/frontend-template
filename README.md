@@ -455,7 +455,8 @@ push 前跑型別檢查與快速測試。
 
 `pnpm check:conventions` 抓的是 ESLint 看不到的「改了 A 卻沒改 B」——
 例如 `runtimeConfig` 多了一個鍵但 `.env.example` 沒跟上。它會在 CI 的檢查 job 裡跑，
-確定是例外時在 commit 訊息或 PR 描述寫 `[skip-policy: 理由]` 即可放行。
+確定是例外時，在 commit 訊息或 PR 描述裡獨立寫一行 `skip-policy` 標記即可放行
+（格式與限制見 [CONTRIBUTING](./docs/CONTRIBUTING.md#送出-pr-前)）。
 
 PR 上還有一層 [AI review](./docs/CONTRIBUTING.md#ai-review-怎麼運作)，
 只留言不阻擋；地端打 `/review` 可以在 push 之前先跑同一份準則。

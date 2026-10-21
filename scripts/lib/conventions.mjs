@@ -237,11 +237,28 @@ export const toConfigKey = (name) =>
 
 /**
  * 找逃生門。硬錯會有例外（例如新增的設定鍵是建置期推導的，本來就沒有環境變數），
- * 寫 `[skip-policy: 理由]` 即可放行；理由會被印出來，所以不會變成無聲的繞過。
+ * 標記獨立寫成一行即可放行；理由會被印出來，所以不會變成無聲的繞過。
+ *
+ * ## 為什麼要求「獨立一行」
+ *
+ * 這個函式掃的是 commit 訊息與 PR 描述這種自由文字，所以**說明這個標記怎麼用，
+ * 本身就會把它武裝起來** —— PR 範本的提示文字、CONTRIBUTING 的說明、
+ * 甚至講解這個功能的 commit 訊息，都會被當成真的要放行。
+ *
+ * 一旦被誤觸發，所有硬錯都降成 warning 並 exit 0：把關看起來還在運作，
+ * 實際上已經失效。這比直接報錯糟得多，因為沒有人會發現。
+ *
+ * 區分方式刻意用結構而不是關鍵字黑名單（黑名單永遠會漏）：
+ * 說明用法一律寫在句子中間或 code span 裡，真的要用就讓它獨立成一行。
  *
  * @param {string} text commit 訊息與 PR 描述
  * @returns {string | null} 放行的理由，沒寫就是 null
  */
 export function findSkipReason(text) {
-  return /\[skip-policy:\s*([^\]]+)\]/.exec(text)?.[1]?.trim() ?? null
+  // 先拿掉 code block 與 code span —— 文件需要「提到」這個標記，提到不等於使用，
+  // 而文件提到它的時候幾乎都包在反引號裡
+  const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '')
+
+  // 標記必須從行首開始（允許縮排），理由不跨行
+  return /^[ \t]*\[skip-policy:\s*([^\]\n]+)\]/m.exec(prose)?.[1]?.trim() ?? null
 }

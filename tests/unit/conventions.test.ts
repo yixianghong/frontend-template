@@ -213,16 +213,52 @@ describe('toEnvName / toConfigKey', () => {
 })
 
 describe('findSkipReason', () => {
-  it('取出理由', () => {
+  it('標記獨立成一行時取出理由', () => {
     expect(findSkipReason('fix: 調整設定\n\n[skip-policy: 這個鍵是建置期推導的]')).toBe(
       '這個鍵是建置期推導的',
     )
+    // 縮排仍然算（清單項目裡的一行）
+    expect(findSkipReason('  [skip-policy: 有理由]')).toBe('有理由')
   })
 
   it('沒寫就是 null', () => {
     expect(findSkipReason('fix: 一般的 commit 訊息')).toBeNull()
     // 只寫標記但沒給理由不算 —— 逃生門必須留下理由
     expect(findSkipReason('[skip-policy:]')).toBeNull()
+  })
+
+  // ── 以下是這個逃生門最危險的失敗模式 ──
+  //
+  // 它掃的是 commit 訊息與 PR 描述這種自由文字，所以「說明這個標記怎麼用」
+  // 本身就會把它武裝起來。一旦被誤觸發，所有硬錯都降成 warning 並 exit 0 ——
+  // 把關看起來還在運作，實際上已經失效，這比直接報錯糟得多。
+  //
+  // 區分方式是結構而不是關鍵字黑名單：說明用法一律寫在句子中間或 code span 裡，
+  // 真的要用就讓它獨立成一行。
+
+  it('句子中間提到不算使用', () => {
+    expect(findSkipReason('確定是例外的話，寫 [skip-policy: 理由] 即可放行。')).toBeNull()
+  })
+
+  it('code span 與 code block 裡提到不算使用', () => {
+    expect(findSkipReason('改成 `[skip-policy: 理由]` 就好')).toBeNull()
+    expect(findSkipReason('範例：\n\n```\n[skip-policy: 理由]\n```\n')).toBeNull()
+  })
+
+  it.each(['.github/PULL_REQUEST_TEMPLATE.md', 'docs/CONTRIBUTING.md', 'README.md', 'CLAUDE.md'])(
+    '%s 的內容不會武裝逃生門',
+    async (path) => {
+      // 沿用預設範本的 PR 會把範本文字留在描述裡，CI 原封不動餵給 PR_BODY。
+      // 文件被貼進 PR 描述也是常見的事。
+      const { readFile } = await import('node:fs/promises')
+      const content = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8')
+
+      expect(findSkipReason(content)).toBeNull()
+    },
+  )
+
+  it('標記不會跨行吃到別的內容', () => {
+    expect(findSkipReason('[skip-policy: 第一行\n第二行]')).toBeNull()
   })
 })
 
