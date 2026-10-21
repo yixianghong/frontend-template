@@ -16,6 +16,7 @@
     "typecheck": "nuxt typecheck",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "check:conventions": "node scripts/check-conventions.mjs",
     "format": "prettier --write \"**/*.{ts,vue,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,vue,json,md,css}\"",
     "test": "vitest run",
