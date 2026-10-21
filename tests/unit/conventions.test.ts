@@ -35,6 +35,22 @@ describe('stripNoise', () => {
     expect(stripNoise('/* { */ x')).not.toContain('{')
     expect(() => stripNoise("const a = 'no closing quote")).not.toThrow()
   })
+
+  it('不把 regex 字面值結尾的斜線當成行註解', () => {
+    // /^https?:\/\// 的最後兩個字元是 //，naive 的實作會把該行剩下的部分全抹掉，
+    // 連同結構用的大括號一起 —— 配對就錯了，而且是靜默的
+    const src = 'const a = { p: /^https?:\\/\\// }'
+
+    expect(stripNoise(src)).toContain('}')
+  })
+
+  it('除法不會被誤認成 regex 開頭', () => {
+    // 前一個非空白字元是運算元結尾時，/ 是除法而不是 regex
+    const src = 'const a = { x: b / c, y: 1 }'
+
+    expect(stripNoise(src)).toContain('y: 1')
+    expect(stripNoise(src)).toContain('}')
+  })
 })
 
 describe('runtimeConfigKeys', () => {
@@ -82,6 +98,38 @@ export default defineNuxtConfig({
 
   it('runtimeConfig 之後的設定不會被算進來', () => {
     expect(runtimeConfigKeys(src).top.has('vite')).toBe(false)
+  })
+
+  it('runtimeConfig 裡有 regex 字面值時仍然配對正確', () => {
+    const withRegex = `
+export default defineNuxtConfig({
+  runtimeConfig: {
+    public: { urlPattern: /^https?:\\/\\// },
+    appName: 'x',
+    siteUrl: '',
+  },
+  vite: { plugins: [] },
+  modules: ['@pinia/nuxt'],
+})
+`
+    const { top, pub } = runtimeConfigKeys(withRegex)
+
+    // 配對錯位的話，runtimeConfig 以外的鍵會被當成設定鍵（假硬錯），
+    // 而頂層的鍵會被誤判成 public（反方向則讓真的機密靜默放過）
+    expect([...top].sort()).toEqual(['appName', 'siteUrl'])
+    expect([...pub]).toEqual(['urlPattern'])
+  })
+
+  it('public 不是物件時，不把別的巢狀物件誤算成 public 的子鍵', () => {
+    const odd = `
+export default defineNuxtConfig({
+  runtimeConfig: {
+    public: PUBLIC_DEFAULTS,
+    nitro: { preset: 'node-server' },
+  },
+})
+`
+    expect([...runtimeConfigKeys(odd).pub]).toEqual([])
   })
 
   it('沒有 runtimeConfig 時回傳空集合而不是炸掉', () => {
@@ -165,16 +213,52 @@ describe('toEnvName / toConfigKey', () => {
 })
 
 describe('findSkipReason', () => {
-  it('取出理由', () => {
+  it('標記獨立成一行時取出理由', () => {
     expect(findSkipReason('fix: 調整設定\n\n[skip-policy: 這個鍵是建置期推導的]')).toBe(
       '這個鍵是建置期推導的',
     )
+    // 縮排仍然算（清單項目裡的一行）
+    expect(findSkipReason('  [skip-policy: 有理由]')).toBe('有理由')
   })
 
   it('沒寫就是 null', () => {
     expect(findSkipReason('fix: 一般的 commit 訊息')).toBeNull()
     // 只寫標記但沒給理由不算 —— 逃生門必須留下理由
     expect(findSkipReason('[skip-policy:]')).toBeNull()
+  })
+
+  // ── 以下是這個逃生門最危險的失敗模式 ──
+  //
+  // 它掃的是 commit 訊息與 PR 描述這種自由文字，所以「說明這個標記怎麼用」
+  // 本身就會把它武裝起來。一旦被誤觸發，所有硬錯都降成 warning 並 exit 0 ——
+  // 把關看起來還在運作，實際上已經失效，這比直接報錯糟得多。
+  //
+  // 區分方式是結構而不是關鍵字黑名單：說明用法一律寫在句子中間或 code span 裡，
+  // 真的要用就讓它獨立成一行。
+
+  it('句子中間提到不算使用', () => {
+    expect(findSkipReason('確定是例外的話，寫 [skip-policy: 理由] 即可放行。')).toBeNull()
+  })
+
+  it('code span 與 code block 裡提到不算使用', () => {
+    expect(findSkipReason('改成 `[skip-policy: 理由]` 就好')).toBeNull()
+    expect(findSkipReason('範例：\n\n```\n[skip-policy: 理由]\n```\n')).toBeNull()
+  })
+
+  it.each(['.github/PULL_REQUEST_TEMPLATE.md', 'docs/CONTRIBUTING.md', 'README.md', 'CLAUDE.md'])(
+    '%s 的內容不會武裝逃生門',
+    async (path) => {
+      // 沿用預設範本的 PR 會把範本文字留在描述裡，CI 原封不動餵給 PR_BODY。
+      // 文件被貼進 PR 描述也是常見的事。
+      const { readFile } = await import('node:fs/promises')
+      const content = await readFile(new URL(`../../${path}`, import.meta.url), 'utf8')
+
+      expect(findSkipReason(content)).toBeNull()
+    },
+  )
+
+  it('標記不會跨行吃到別的內容', () => {
+    expect(findSkipReason('[skip-policy: 第一行\n第二行]')).toBeNull()
   })
 })
 

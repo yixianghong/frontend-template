@@ -12,11 +12,15 @@
 export const SECRET_NAME_PATTERN = /secret|password|token|credential|api_?key|private/i
 
 /**
- * 把註解與字串內容抹成空白，只留下程式碼結構。
+ * 把註解、字串與 regex 字面值的內容抹成空白，只留下程式碼結構。
  *
- * 後面要用大括號配對找出 `runtimeConfig` 的範圍，而註解或字串裡的 `{` 會把配對算錯
- * （這個專案的註解量很大，一定會踩到）。抹的時候保留原本的長度與換行，
+ * 後面要用大括號配對找出 `runtimeConfig` 的範圍，而註解、字串或 regex 裡的 `{`
+ * 會把配對算錯（這個專案的註解量很大，一定會踩到）。抹的時候保留原本的長度與換行，
  * 所以處理後的字元位置仍然對得上原始位置。
+ *
+ * regex 不能只靠「看到 / 就跳過」—— `/^https?:\/\//` 的最後兩個字元剛好是 `//`，
+ * 不處理的話會被當成行註解，該行剩下的部分（可能包含結構用的大括號）會一起被抹掉，
+ * 配對就錯了，而且是靜默地錯。
  *
  * @param {string} src
  * @returns {string}
@@ -27,9 +31,13 @@ export function stripNoise(src) {
     for (let k = from; k < to; k++) if (out[k] !== '\n') out[k] = ' '
   }
 
+  /** 上一個屬於程式碼的非空白字元，用來判斷 `/` 是 regex 開頭還是除法。 */
+  let prev = ''
   let i = 0
+
   while (i < src.length) {
     const two = src.slice(i, i + 2)
+
     if (two === '//') {
       const end = src.indexOf('\n', i)
       const stop = end === -1 ? src.length : end
@@ -46,11 +54,80 @@ export function stripNoise(src) {
       while (j < src.length && src[j] !== quote) j += src[j] === '\\' ? 2 : 1
       blank(i + 1, Math.min(j, src.length))
       i = Math.min(j + 1, src.length)
+      prev = quote
+    } else if (src[i] === '/' && (prev === '' || REGEX_CAN_FOLLOW.has(prev))) {
+      const end = regexEnd(src, i)
+      if (end === -1) {
+        // 找不到收尾（或跨行了）—— 表示判斷錯了，這個 / 其實是除法
+        prev = '/'
+        i++
+      } else {
+        blank(i + 1, end) // 只抹內容，兩個斜線留著當佔位，它們不是大括號
+        i = end + 1
+        prev = '/'
+      }
     } else {
+      if (!/\s/.test(src[i])) prev = src[i]
       i++
     }
   }
+
   return out.join('')
+}
+
+/**
+ * regex 字面值只能出現在「需要運算元」的位置。這個集合涵蓋設定檔會出現的情況：
+ * 物件的值（`:`）、陣列元素與引數（`,` `(` `[`）、賦值（`=`）、運算子。
+ * 前一個字元是識別字或 `)` 的時候，`/` 是除法。
+ */
+const REGEX_CAN_FOLLOW = new Set([
+  '(',
+  ',',
+  '=',
+  ':',
+  '[',
+  '!',
+  '&',
+  '|',
+  '?',
+  '{',
+  '}',
+  ';',
+  '+',
+  '-',
+  '*',
+  '%',
+  '^',
+  '<',
+  '>',
+  '~',
+])
+
+/**
+ * 找 regex 字面值的收尾斜線位置，找不到回傳 -1。
+ *
+ * 字元類別裡的 `/` 不算收尾（`/[/]/` 是合法的），跨行也不算 ——
+ * regex 不能跨行，掃到換行就表示前面的判斷是錯的。
+ *
+ * @param {string} src
+ * @param {number} start 開頭斜線的位置
+ * @returns {number}
+ */
+function regexEnd(src, start) {
+  let inClass = false
+
+  for (let j = start + 1; j < src.length && src[j] !== '\n'; j++) {
+    const char = src[j]
+    if (char === '\\') {
+      j++
+      continue
+    }
+    if (char === '[') inClass = true
+    else if (char === ']') inClass = false
+    else if (char === '/' && !inClass) return j
+  }
+
+  return -1
 }
 
 /**
@@ -96,8 +173,13 @@ export function runtimeConfigKeys(src) {
 
     const name = key[1]
     if (depth === 1) {
-      if (name === 'public') publicDepth = 2
-      else top.add(name)
+      if (name === 'public') {
+        // 只有 public 真的是物件字面值時才記下它的深度 —— 否則 runtimeConfig 底下
+        // 別的巢狀物件（例如 nitro: { ... }）的子鍵會被誤算成 public 的設定
+        if (/^\s*\{/.test(clean.slice(i + key[0].length))) publicDepth = 2
+      } else {
+        top.add(name)
+      }
     } else if (depth === publicDepth) {
       pub.add(name)
     }
@@ -155,11 +237,28 @@ export const toConfigKey = (name) =>
 
 /**
  * 找逃生門。硬錯會有例外（例如新增的設定鍵是建置期推導的，本來就沒有環境變數），
- * 寫 `[skip-policy: 理由]` 即可放行；理由會被印出來，所以不會變成無聲的繞過。
+ * 標記獨立寫成一行即可放行；理由會被印出來，所以不會變成無聲的繞過。
+ *
+ * ## 為什麼要求「獨立一行」
+ *
+ * 這個函式掃的是 commit 訊息與 PR 描述這種自由文字，所以**說明這個標記怎麼用，
+ * 本身就會把它武裝起來** —— PR 範本的提示文字、CONTRIBUTING 的說明、
+ * 甚至講解這個功能的 commit 訊息，都會被當成真的要放行。
+ *
+ * 一旦被誤觸發，所有硬錯都降成 warning 並 exit 0：把關看起來還在運作，
+ * 實際上已經失效。這比直接報錯糟得多，因為沒有人會發現。
+ *
+ * 區分方式刻意用結構而不是關鍵字黑名單（黑名單永遠會漏）：
+ * 說明用法一律寫在句子中間或 code span 裡，真的要用就讓它獨立成一行。
  *
  * @param {string} text commit 訊息與 PR 描述
  * @returns {string | null} 放行的理由，沒寫就是 null
  */
 export function findSkipReason(text) {
-  return /\[skip-policy:\s*([^\]]+)\]/.exec(text)?.[1]?.trim() ?? null
+  // 先拿掉 code block 與 code span —— 文件需要「提到」這個標記，提到不等於使用，
+  // 而文件提到它的時候幾乎都包在反引號裡
+  const prose = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, '')
+
+  // 標記必須從行首開始（允許縮排），理由不跨行
+  return /^[ \t]*\[skip-policy:\s*([^\]\n]+)\]/m.exec(prose)?.[1]?.trim() ?? null
 }

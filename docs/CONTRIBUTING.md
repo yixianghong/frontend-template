@@ -282,8 +282,18 @@ pre-push hook 會跑型別檢查與快速測試，e2e 留給 CI。
   所以軟提醒只負責把事實攤出來，由 review 去判斷。
 
 硬錯確實會有例外（例如新增的設定鍵是建置期推導的，本來就沒有對應的環境變數）。
-在 commit 訊息或 PR 描述寫 `[skip-policy: 理由]` 即可放行，理由會被印在 CI log 裡，
-所以不會變成無聲的繞過。
+在 commit 訊息或 PR 描述裡**獨立寫成一行**即可放行：
+
+```
+[skip-policy: 這個設定鍵是建置期推導的，沒有對應的環境變數]
+```
+
+理由會被印在 CI log 裡，所以不會變成無聲的繞過。
+
+> ⚠️ 標記必須自己佔一行。寫在句子中間（像這句話裡的 `[skip-policy: 理由]`）**不算**。
+> 這個限制是刻意的：檢查的對象是 commit 訊息與 PR 描述這種自由文字，
+> 如果「提到」等於「使用」，那麼光是在文件或 PR 範本裡解釋這個功能，
+> 就會把所有硬錯悄悄降成 warning —— 把關看起來還在，其實已經失效。
 
 想在 push 之前先看一次 review 意見的話，在 Claude Code 裡打 `/review`（見下）。
 
@@ -292,6 +302,29 @@ pre-push hook 會跑型別檢查與快速測試，e2e 留給 CI。
 PR 上有一層 AI reviewer（[`.github/workflows/ai-review.yml`](../.github/workflows/ai-review.yml)），
 讀的準則是 [`.github/AI_REVIEW.md`](../.github/AI_REVIEW.md)。
 地端打 `/review` 跑的是同一份準則，所以 push 上去不會出現意外的留言。
+
+### 第一次啟用時要做的事
+
+需要兩件事，**缺一不可**：
+
+1. **把 Claude Code GitHub App 裝到這個 repo** ——
+   在 Claude Code 裡執行 `/install-github-app`，或直接安裝
+   [github.com/apps/claude](https://github.com/apps/claude)。需要 repo 管理員權限。
+2. **設好 secret**：
+
+   ```bash
+   claude setup-token                    # 產生 OAuth token
+   gh secret set CLAUDE_CODE_OAUTH_TOKEN  # 貼進 GitHub Secrets
+   gh label create skip-ai-review -d "這個 PR 跳過 AI review"
+   ```
+
+只做第 2 步而沒做第 1 步的話，action 會拿到 401 並且**什麼都不做**。
+因為 workflow 掛了 `continue-on-error`，check 仍然是綠的 ——
+所以 workflow 裡多了一步，會在這種情況下印出 `::warning` 說明原因。
+覺得 AI 突然不再留言時，先去 PR 上看有沒有那條 warning。
+
+`CLAUDE_CODE_OAUTH_TOKEN` 會過期，這是這個方案最主要的維運成本。
+嫌輪替麻煩的話把 workflow 的那一行換成 `anthropic_api_key`，改成按量計費。
 
 ### 三層的分工
 
@@ -309,6 +342,16 @@ PR 上有一層 AI reviewer（[`.github/workflows/ai-review.yml`](../.github/wor
 AI review **刻意不設成 required check**，而且 workflow 上掛了 `continue-on-error`。
 LLM 的輸出是非確定性的，一旦當成必要檢查，第一次誤判卡住 merge 就會有人去關掉它，
 整套機制就報廢了。它的角色是 reviewer，不是 gate。
+
+### 改到 workflow 本身的 PR 不會被 review
+
+action 會比對 `.github/workflows/ai-review.yml` 與 `main` 上的版本，內容不一致就
+拒絕執行（Actions log 裡是 `Skipping action due to workflow validation`）。
+這是它自己的安全機制：否則 PR 作者只要在 PR 裡改掉 prompt，就能指示 reviewer 放水。
+
+所以動到那個檔案的 PR 得靠人看，合併之後才會生效 —— 第一次把這套機制加進專案的那支
+PR 也一樣。這種情況 action 以 exit 0 結束，所以上面那個偵測失敗的步驟不會觸發，
+但 action 自己會在 run summary 留一條 warning。
 
 ### 關掉某個 PR 的 AI review
 

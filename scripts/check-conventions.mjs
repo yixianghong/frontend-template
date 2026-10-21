@@ -15,6 +15,12 @@
  * 所以軟提醒只負責把事實攤在 PR 上，由 reviewer 去判斷（見 `.github/AI_REVIEW.md`）。
  * 把判斷題做成硬 gate，結果一定是有人去把它關掉。
  *
+ * ## 逃生門
+ *
+ * 硬錯會有例外（例如新增的設定鍵是建置期推導的，本來就沒有對應的環境變數）。
+ * 在 commit 訊息或 PR 描述裡把 skip-policy 標記**獨立寫成一行**即可放行，
+ * 格式與理由見 `lib/conventions.mjs` 的 `findSkipReason`。
+ *
  * ## 用法
  *
  *     node scripts/check-conventions.mjs [base-ref]
@@ -244,6 +250,8 @@ if (skipReason) {
 
 console.log(
   `\n[約定檢查] ${errors.length} 項未通過。` +
-    '確定是例外的話，在 commit 訊息或 PR 描述寫 [skip-policy: 理由] 即可放行。',
+    '確定是例外的話，在 commit 訊息或 PR 描述裡「獨立寫一行」skip-policy 標記即可放行。\n' +
+    '格式見 docs/CONTRIBUTING.md 的「送出 PR 前」。寫在句子中間不算 ——\n' +
+    '否則光是在文件裡提到這個標記，就會把所有硬錯悄悄關掉。',
 )
 process.exit(1)

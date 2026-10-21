@@ -41,7 +41,7 @@ jobs:
       - name: 約定檢查
         run: pnpm check:conventions
         env:
-          # 讓 [skip-policy: 理由] 也能寫在 PR 描述而不只是 commit 訊息裡
+          # 讓 skip-policy 標記也能寫在 PR 描述而不只是 commit 訊息裡
           PR_BODY: ${{ github.event.pull_request.body }}
 
       - name: 格式檢查
