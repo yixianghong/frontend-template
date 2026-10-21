@@ -70,7 +70,10 @@ jobs:
             1. 先完整讀 .github/AI_REVIEW.md。那是本專案的審查準則，包含嚴重度分級、
                檢查清單，以及一份「不要報什麼」的清單。那份清單的優先級高於你自己的判斷，
                請嚴格遵守。
-            2. 用 `gh pr diff` 取得這次的改動，只 review 改動到的程式碼。
+            2. 用 `gh pr diff --name-only` 先看動了哪些檔案，再**逐檔**用
+               `gh pr diff -- <檔案>` 取內容。不要一次抓整份 diff —— 稍大的 PR
+               就會超過單次輸出上限而被截斷，而截斷發生在你看到內容之前，
+               你不會知道自己漏看了什麼。程式碼優先於文件。
             3. 需要理解上下文時去讀相關檔案（例如改了 composable 就去看呼叫它的頁面）。
                規則本體在 docs/CONTRIBUTING.md。
             4. 把 Blocker 與 Major 的發現用 inline comment 留在對應的行，

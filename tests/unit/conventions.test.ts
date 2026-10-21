@@ -35,6 +35,22 @@ describe('stripNoise', () => {
     expect(stripNoise('/* { */ x')).not.toContain('{')
     expect(() => stripNoise("const a = 'no closing quote")).not.toThrow()
   })
+
+  it('不把 regex 字面值結尾的斜線當成行註解', () => {
+    // /^https?:\/\// 的最後兩個字元是 //，naive 的實作會把該行剩下的部分全抹掉，
+    // 連同結構用的大括號一起 —— 配對就錯了，而且是靜默的
+    const src = 'const a = { p: /^https?:\\/\\// }'
+
+    expect(stripNoise(src)).toContain('}')
+  })
+
+  it('除法不會被誤認成 regex 開頭', () => {
+    // 前一個非空白字元是運算元結尾時，/ 是除法而不是 regex
+    const src = 'const a = { x: b / c, y: 1 }'
+
+    expect(stripNoise(src)).toContain('y: 1')
+    expect(stripNoise(src)).toContain('}')
+  })
 })
 
 describe('runtimeConfigKeys', () => {
@@ -82,6 +98,38 @@ export default defineNuxtConfig({
 
   it('runtimeConfig 之後的設定不會被算進來', () => {
     expect(runtimeConfigKeys(src).top.has('vite')).toBe(false)
+  })
+
+  it('runtimeConfig 裡有 regex 字面值時仍然配對正確', () => {
+    const withRegex = `
+export default defineNuxtConfig({
+  runtimeConfig: {
+    public: { urlPattern: /^https?:\\/\\// },
+    appName: 'x',
+    siteUrl: '',
+  },
+  vite: { plugins: [] },
+  modules: ['@pinia/nuxt'],
+})
+`
+    const { top, pub } = runtimeConfigKeys(withRegex)
+
+    // 配對錯位的話，runtimeConfig 以外的鍵會被當成設定鍵（假硬錯），
+    // 而頂層的鍵會被誤判成 public（反方向則讓真的機密靜默放過）
+    expect([...top].sort()).toEqual(['appName', 'siteUrl'])
+    expect([...pub]).toEqual(['urlPattern'])
+  })
+
+  it('public 不是物件時，不把別的巢狀物件誤算成 public 的子鍵', () => {
+    const odd = `
+export default defineNuxtConfig({
+  runtimeConfig: {
+    public: PUBLIC_DEFAULTS,
+    nitro: { preset: 'node-server' },
+  },
+})
+`
+    expect([...runtimeConfigKeys(odd).pub]).toEqual([])
   })
 
   it('沒有 runtimeConfig 時回傳空集合而不是炸掉', () => {
