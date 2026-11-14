@@ -1,4 +1,5 @@
 import tailwindcss from '@tailwindcss/vite'
+import { CSRF_HEADER_NAME } from './shared/constants/http'
 
 /**
  * 樣板示範（`app/pages/demo/**` 與 `server/api/demo/**`）是否啟用。
@@ -25,7 +26,42 @@ export default defineNuxtConfig({
 
   devtools: { enabled: true },
 
-  modules: ['@nuxt/eslint', '@pinia/nuxt', '@vueuse/nuxt', '@nuxtjs/i18n'],
+  modules: ['@nuxt/eslint', '@pinia/nuxt', '@vueuse/nuxt', '@nuxtjs/i18n', 'nuxt-csurf'],
+
+  /**
+   * ## CSRF 防護（nuxt-csurf）
+   *
+   * ```
+   * SSR 渲染頁面時：產生 secret → 寫進 httpOnly cookie
+   *                 用 secret 簽出 token → 寫進 <meta name="csrf-token">
+   * 前端發寫入請求：useApiClient 讀 meta，放進 x-csrf-token header
+   * 模組 middleware：用 cookie 裡的 secret 驗證 header 的 token
+   * ```
+   *
+   * 惡意網站能讓瀏覽器自動帶上 cookie，但因為同源政策讀不到我們頁面裡的 token。
+   * token 從第一次打開頁面就存在，所以**登入請求也受保護**（防 login CSRF）。
+   *
+   * 驗證失敗由模組丟 403，`server/utils/errors.ts` 的 `toAppError` 會把它轉成
+   * `CSRF_INVALID` 錯誤信封。
+   *
+   * 與模組預設值不同的地方：
+   * - `methodsToProtect` 補上 DELETE（模組預設只有 POST/PUT/PATCH）
+   * - cookie 用 `lax` 而非預設的 `strict`：`strict` 下從外部連結點進來時不會帶 cookie，
+   *   SSR 會發一組新 secret 把舊的蓋掉，使用者其他已開著的分頁就會全部驗證失敗
+   * - header 名稱沿用 `shared/constants/http.ts`，讓 CORS 白名單與這裡保持一致
+   *
+   * `encryptSecret` 未設定時模組會在**建置期**隨機產生，同一份建置的多個實例共用。
+   * 代價是每次部署後，部署前打開的頁面要重新整理才能送出寫入請求。
+   */
+  csurf: {
+    methodsToProtect: ['POST', 'PUT', 'PATCH', 'DELETE'],
+    headerName: CSRF_HEADER_NAME,
+    cookie: {
+      path: '/',
+      httpOnly: true,
+      sameSite: 'lax',
+    },
+  },
 
   css: ['~/assets/css/main.css'],
 

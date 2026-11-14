@@ -122,7 +122,7 @@ CLAUDE.md               AI coding agent 的入口，指向 docs/CONTRIBUTING.md
   ├─ middleware/20.cors.ts              CORS 白名單（預設不開放跨域）
   ├─ middleware/30.rate-limit.ts        流量限制
   ├─ middleware/40.body-guard.ts        body 大小與 Content-Type 檢查
-  ├─ middleware/50.csrf.ts              CSRF double-submit 驗證
+  ├─ (nuxt-csurf)                       CSRF token 驗證（模組註冊，排在所有 middleware 之後）
   │
   ├─ api/**                             defineApiHandler 包裝，統一格式與錯誤處理
   │    └─ utils/upstream.ts             呼叫外部 API（timeout / retry / 斷路器）
@@ -293,7 +293,7 @@ export default defineApiHandler(async (event) => {
 | CORS      | `server/middleware/20.cors.ts`             | 白名單比對，預設不開放跨域                                      |
 | 流量限制  | `server/middleware/30.rate-limit.ts`       | 固定時間窗，多實例請換 Redis                                    |
 | Body 防護 | `server/middleware/40.body-guard.ts`       | 大小上限 + Content-Type 白名單                                  |
-| CSRF      | `server/middleware/50.csrf.ts`             | double-submit cookie，定值時間比對                              |
+| CSRF      | `nuxt-csurf`（設定見 `nuxt.config.ts`）    | SSR 發 token、httpOnly secret，登入請求也受保護                 |
 | 輸入驗證  | `server/utils/validate.ts`                 | zod，失敗回 400 + 欄位錯誤                                      |
 | Session   | `server/utils/session.ts`                  | httpOnly 加密 cookie，**token 不離開 Node 層**                  |
 | 日誌遮罩  | `server/utils/logger.ts`                   | authorization / cookie / password / token 自動遮罩              |

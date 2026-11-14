@@ -1,4 +1,4 @@
-import { CSRF_COOKIE_NAME, CSRF_HEADER_NAME, SAFE_METHODS } from '#shared/constants/http'
+import { SAFE_METHODS } from '#shared/constants/http'
 import { ApiError, isApiFailure } from '~/utils/api-error'
 
 /**
@@ -24,8 +24,12 @@ import { ApiError, isApiFailure } from '~/utils/api-error'
  * SSR 就能取得正確的登入狀態。
  *
  * ### 2. CSRF Token 自動附加
- * 從前端可讀的 `csrf_token` cookie 取值，放進 `x-csrf-token` header。
- * 只對非安全方法（POST/PUT/PATCH/DELETE）附加，符合 BFF `50.csrf.ts` 的驗證邏輯。
+ * 透過 nuxt-csurf 的 `useCsrf()` 讀取 SSR 寫在 `<meta name="csrf-token">` 的 token，
+ * 放進它指定的 header（`x-csrf-token`）。只對非安全方法（POST/PUT/PATCH/DELETE）附加，
+ * 與 `nuxt.config.ts` 的 `csurf.methodsToProtect` 一致。
+ *
+ * 不直接用模組提供的 `$csrfFetch` / `useCsrfFetch`：它們沒有 SSR cookie 轉發與錯誤正規化，
+ * 而且會對 GET 也附加 header。
  *
  * ### 3. 錯誤正規化
  * 任何非 2xx 回應都會被轉成 `ApiError` 拋出，帶著 `code` / `message` /
@@ -44,7 +48,8 @@ export function useApiClient() {
   // SSR 期間讀取瀏覽器送來的 cookie；client 端由瀏覽器自動處理，不需要（也讀不到）
   const forwardedHeaders = import.meta.server ? useRequestHeaders(['cookie']) : {}
 
-  const csrfCookie = useCookie(CSRF_COOKIE_NAME, { readonly: true })
+  // client 端讀 meta tag；SSR 期間沒有 token（本樣板不在 SSR 階段發寫入請求）
+  const { csrf, headerName: csrfHeaderName } = useCsrf()
 
   return $fetch.create({
     baseURL: config.public.apiBase,
@@ -67,8 +72,8 @@ export function useApiClient() {
       // --- CSRF token ---
       const method = (options.method ?? 'GET').toUpperCase()
       const isSafeMethod = SAFE_METHODS.includes(method as (typeof SAFE_METHODS)[number])
-      if (!isSafeMethod && csrfCookie.value) {
-        headers.set(CSRF_HEADER_NAME, csrfCookie.value)
+      if (!isSafeMethod && csrf) {
+        headers.set(csrfHeaderName, csrf)
       }
 
       options.headers = headers

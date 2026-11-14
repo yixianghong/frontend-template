@@ -90,6 +90,12 @@ export function toAppError(err: unknown): AppError {
   const unwrapped = unwrapAppError(err)
   if (unwrapped) return unwrapped
 
+  // nuxt-csurf 的 middleware 拋的是 h3 createError，種類標在 name（h3 會把原始輸入放進 cause）。
+  // 這裡要先攔下來，否則 403 會被反查成 FORBIDDEN，訊息也會外露模組的英文字串。
+  if (hasErrorName(err, CSURF_ERROR_NAME)) {
+    return new AppError(ERROR_CODE.CSRF_INVALID, undefined, { cause: err })
+  }
+
   // h3 createError() 或其他帶 statusCode 的錯誤（例如 Nitro 內建的 404）
   if (err && typeof err === 'object' && 'statusCode' in err) {
     const status = Number((err as { statusCode: unknown }).statusCode)
@@ -117,6 +123,17 @@ function unwrapAppError(err: unknown, depth = 0): AppError | null {
   if (isAppError(err)) return err
   if ('cause' in err) return unwrapAppError(err.cause, depth + 1)
   return null
+}
+
+/** nuxt-csurf 驗證失敗時標在錯誤上的 name。 */
+const CSURF_ERROR_NAME = 'EBADCSRFTOKEN'
+
+/** 沿 cause 鏈尋找指定 name 的錯誤（深度限制同 `unwrapAppError`）。 */
+function hasErrorName(err: unknown, name: string, depth = 0): boolean {
+  if (depth > 5 || !err || typeof err !== 'object') return false
+  if ('name' in err && err.name === name) return true
+  if ('cause' in err) return hasErrorName(err.cause, name, depth + 1)
+  return false
 }
 
 /** HTTP 狀態碼 → 錯誤碼的反向對應。找不到精確對應時退回 4xx/5xx 的泛用碼。 */

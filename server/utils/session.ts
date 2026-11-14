@@ -1,6 +1,6 @@
-import { useSession, setCookie, deleteCookie, type H3Event } from 'h3'
+import { useSession, type H3Event } from 'h3'
 import { AppError, ERROR_CODE } from './errors'
-import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from '../../shared/constants/http'
+import { SESSION_COOKIE_NAME } from '../../shared/constants/http'
 import type { PublicUser } from '../../shared/schemas/auth'
 
 /**
@@ -49,8 +49,6 @@ export interface AppSessionData {
   refreshToken?: string
   /** access token 的到期時間（epoch ms），用於判斷是否需要 refresh。 */
   accessTokenExpiresAt?: number
-  /** CSRF double-submit 用的隨機字串。 */
-  csrfToken?: string
 }
 
 /** 取得（或初始化）本次請求的 session。 */
@@ -78,9 +76,6 @@ export async function useAppSession(event: H3Event) {
 /**
  * 建立登入 session。
  *
- * 同時產生 CSRF token 並寫入兩個地方：session（後端比對用）與一個
- * 前端可讀的 cookie（前端 echo 回 header 用），構成 double-submit 防護。
- *
  * @example
  * ```ts
  * // server/api/auth/login.post.ts
@@ -99,7 +94,6 @@ export async function createUserSession(
   },
 ): Promise<void> {
   const session = await useAppSession(event)
-  const csrfToken = generateToken()
 
   await session.update({
     user: payload.user,
@@ -108,18 +102,20 @@ export async function createUserSession(
     accessTokenExpiresAt: payload.expiresInSeconds
       ? Date.now() + payload.expiresInSeconds * 1000
       : undefined,
-    csrfToken,
   })
 
-  setCsrfCookie(event, csrfToken)
   event.context.user = payload.user
 }
 
-/** 清除 session 與 CSRF cookie（登出）。 */
+/**
+ * 清除 session（登出）。
+ *
+ * CSRF secret cookie 刻意保留：它綁的是「這個瀏覽器」而不是登入狀態，
+ * 清掉反而會讓頁面上的 token 失效，登出後馬上再登入就會被擋。
+ */
 export async function clearUserSession(event: H3Event): Promise<void> {
   const session = await useAppSession(event)
   await session.clear()
-  deleteCookie(event, CSRF_COOKIE_NAME, { path: '/' })
   event.context.user = undefined
 }
 
@@ -177,27 +173,4 @@ export async function requireRole(event: H3Event, roles: string[]): Promise<Publ
 export async function getUpstreamToken(event: H3Event): Promise<string | null> {
   const session = await useAppSession(event)
   return session.data.accessToken ?? null
-}
-
-/** 讀取 session 中的 CSRF token，供 `50.csrf.ts` 比對。 */
-export async function getSessionCsrfToken(event: H3Event): Promise<string | null> {
-  const session = await useAppSession(event)
-  return session.data.csrfToken ?? null
-}
-
-/** 寫入前端可讀的 CSRF cookie（double-submit 的其中一「submit」）。 */
-export function setCsrfCookie(event: H3Event, token: string): void {
-  const config = useRuntimeConfig(event)
-  setCookie(event, CSRF_COOKIE_NAME, token, {
-    httpOnly: false, // 刻意可讀：前端需要取出它並放進 request header
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: config.sessionMaxAge,
-  })
-}
-
-/** 產生密碼學安全的隨機 token。 */
-function generateToken(): string {
-  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
 }

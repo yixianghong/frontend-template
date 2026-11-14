@@ -79,6 +79,24 @@ describe('toAppError', () => {
     expect(toAppError(wrapped).code).toBe('CSRF_INVALID')
   })
 
+  // nuxt-csurf 的 middleware 用 h3 createError 丟 403，並以 name 標記錯誤種類。
+  // 不特別處理的話會被狀態碼反查成 FORBIDDEN，訊息也會外露模組的英文字串。
+  it('nuxt-csurf 拋出的錯誤對應到 CSRF_INVALID，並換成我們自己的訊息', async () => {
+    const { createError } = await import('h3')
+    const csurfError = createError({
+      statusCode: 403,
+      name: 'EBADCSRFTOKEN',
+      statusMessage: 'CSRF Token Mismatch',
+      message: 'CSRF Token not found',
+    })
+
+    const converted = toAppError(csurfError)
+
+    expect(converted.code).toBe('CSRF_INVALID')
+    expect(converted.statusCode).toBe(403)
+    expect(converted.message).toBe('安全性驗證失敗，請重新整理頁面')
+  })
+
   it('cause 巢狀多層仍能找回原始錯誤', () => {
     const original = new AppError(ERROR_CODE.RATE_LIMITED)
     const wrapped = new Error('outer', { cause: new Error('inner', { cause: original }) })

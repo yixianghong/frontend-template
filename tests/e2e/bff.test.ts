@@ -183,13 +183,49 @@ describe('BFF 代理外部 API', () => {
   })
 })
 
+/**
+ * 模擬「使用者打開頁面」：由 SSR 發一組 CSRF secret（httpOnly cookie）與對應 token
+ * （寫在 `<meta name="csrf-token">`）。瀏覽器裡由 `useApiClient` 自動讀取並帶上，
+ * 這裡手動做同一件事。
+ */
+async function openPage(): Promise<{ cookie: string; token: string }> {
+  const response = await fetch('/')
+  const html = await response.text()
+  const token = html.match(/<meta name="csrf-token" content="([^"]+)">/)?.[1] ?? ''
+  const cookie = response.headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ')
+  return { cookie, token }
+}
+
+/** 合併兩組 `cookie` header 字串。 */
+function joinCookies(...parts: string[]): string {
+  return parts.filter(Boolean).join('; ')
+}
+
+/** 以「打開頁面 → 登入」的完整流程登入，回傳登入回應與後續請求要帶的憑證。 */
+async function loginAs(email: string, password = 'password1234') {
+  const page = await openPage()
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: page.cookie,
+      'x-csrf-token': page.token,
+    },
+    body: JSON.stringify({ email, password }),
+  })
+  const sessionCookie = response.headers
+    .getSetCookie()
+    .map((c) => c.split(';')[0])
+    .join('; ')
+  return { response, cookie: joinCookies(page.cookie, sessionCookie), token: page.token }
+}
+
 describe('認證：token 絕不離開 Node 層', () => {
   async function login(password = 'password1234') {
-    return fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'e2e@example.com', password }),
-    })
+    return (await loginAs('e2e@example.com', password)).response
   }
 
   it('登入成功只回傳公開的使用者資料', async () => {
@@ -231,14 +267,6 @@ describe('認證：token 絕不離開 Node 層', () => {
     expect(setCookie).not.toContain('upstream-secret-access-token')
   })
 
-  it('CSRF cookie 刻意可被 JS 讀取（double-submit 需要）', async () => {
-    const setCookie = (await login()).headers.get('set-cookie') ?? ''
-    const csrfPart = setCookie.split(',').find((part) => part.includes('csrf_token='))
-
-    expect(csrfPart).toBeTruthy()
-    expect(csrfPart?.toLowerCase()).not.toContain('httponly')
-  })
-
   it('帳密錯誤回傳 401 且不透露是帳號還是密碼錯', async () => {
     const response = await login('wrong-password')
     const body = await response.json()
@@ -254,12 +282,9 @@ describe('認證：token 絕不離開 Node 層', () => {
   })
 
   it('帶著 session cookie 就能取回使用者資料', async () => {
-    const cookies = (await login()).headers
-      .getSetCookie()
-      .map((c) => c.split(';')[0])
-      .join('; ')
+    const { cookie } = await loginAs('e2e@example.com')
 
-    const response = await fetch('/api/auth/me', { headers: { cookie: cookies } })
+    const response = await fetch('/api/auth/me', { headers: { cookie } })
     const body = await response.json()
 
     expect(response.status).toBe(200)
@@ -267,61 +292,87 @@ describe('認證：token 絕不離開 Node 層', () => {
   })
 })
 
-describe('CSRF 防護', () => {
-  it('已登入但缺少 CSRF header 的寫入請求會被擋下', async () => {
-    const loginResponse = await fetch('/api/auth/login', {
+describe('CSRF 防護（nuxt-csurf）', () => {
+  it('SSR 頁面發出 token，secret cookie 為 httpOnly', async () => {
+    const response = await fetch('/')
+    const html = await response.text()
+    const secretCookie = response.headers.getSetCookie().find((c) => /^(__Host-)?csrf=/.test(c))
+
+    expect(html).toMatch(/<meta name="csrf-token" content="[^"]+">/)
+    expect(secretCookie).toBeTruthy()
+    expect(secretCookie?.toLowerCase()).toContain('httponly')
+    expect(secretCookie?.toLowerCase()).toContain('samesite=lax')
+  })
+
+  // login CSRF：攻擊者讓受害者在不知情下登入攻擊者的帳號
+  it('登入請求也要驗證 token', async () => {
+    const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ email: 'csrf@example.com', password: 'password1234' }),
-    })
-    const cookies = loginResponse.headers
-      .getSetCookie()
-      .map((c) => c.split(';')[0])
-      .join('; ')
-
-    // 惡意網站能讓瀏覽器自動帶上 cookie，但因為同源政策讀不到 cookie 內容，
-    // 所以填不出正確的 x-csrf-token header
-    const response = await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { cookie: cookies },
     })
 
     expect(response.status).toBe(403)
     expect((await response.json()).error.code).toBe('CSRF_INVALID')
   })
 
+  it('已登入但缺少 CSRF header 的寫入請求會被擋下', async () => {
+    const { cookie } = await loginAs('csrf@example.com')
+
+    // 惡意網站能讓瀏覽器自動帶上 cookie，但讀不到我們頁面裡的 token，
+    // 所以填不出正確的 x-csrf-token header
+    const response = await fetch('/api/auth/logout', { method: 'POST', headers: { cookie } })
+
+    expect(response.status).toBe(403)
+    const body = await response.json()
+    expect(body.error.code).toBe('CSRF_INVALID')
+    expect(body.error.message).not.toContain('CSRF Token')
+  })
+
   it('帶上正確的 CSRF token 就能通過', async () => {
-    const loginResponse = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'csrf2@example.com', password: 'password1234' }),
-    })
-    const setCookies = loginResponse.headers.getSetCookie()
-    const cookies = setCookies.map((c) => c.split(';')[0]).join('; ')
-    const csrfToken = setCookies
-      .find((c) => c.startsWith('csrf_token='))
-      ?.split(';')[0]
-      ?.replace('csrf_token=', '')
+    const { response: loginResponse, cookie, token } = await loginAs('csrf2@example.com')
+    expect(loginResponse.status).toBe(200)
 
     const response = await fetch('/api/auth/logout', {
       method: 'POST',
-      headers: { cookie: cookies, 'x-csrf-token': decodeURIComponent(csrfToken ?? '') },
+      headers: { cookie, 'x-csrf-token': token },
     })
 
     expect(response.status).toBe(200)
   })
 
-  it('未登入的請求不需要 CSRF token（沒有登入狀態可盜用）', async () => {
-    const response = await fetch('/api/auth/logout', { method: 'POST' })
+  it('DELETE 也受保護（nuxt-csurf 預設不含 DELETE）', async () => {
+    const { cookie } = await openPage()
+    const response = await fetch('/api/demo/1', { method: 'DELETE', headers: { cookie } })
+
+    expect(response.status).toBe(403)
+    expect((await response.json()).error.code).toBe('CSRF_INVALID')
+  })
+
+  it('token 不能跨訪客挪用', async () => {
+    const victim = await openPage()
+    const attacker = await openPage()
+
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { cookie: victim.cookie, 'x-csrf-token': attacker.token },
+    })
+
+    expect(response.status).toBe(403)
+  })
+
+  it('GET 不需要 token', async () => {
+    const response = await fetch('/api/health')
     expect(response.status).toBe(200)
   })
 })
 
 describe('請求主體防護', () => {
   it('拒絕不支援的 Content-Type', async () => {
+    const { cookie, token } = await openPage()
     const response = await fetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'content-type': 'application/xml' },
+      headers: { 'content-type': 'application/xml', cookie, 'x-csrf-token': token },
       body: '<login />',
     })
 
